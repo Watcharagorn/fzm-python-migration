@@ -166,7 +166,7 @@ class DatabaseBackend(object):
         self.init_connection(self._connection)
         self.migration_table =  migration_table_prefix + migration_table
         self.log_table = migration_table_prefix + self.log_table
-        self.lock_table = migration_table_prefix + self.lock_table
+        self.lock_table = migration_table_prefix + "_" + self.lock_table
         self.version_table = migration_table_prefix + self.version_table
         self.has_transactional_ddl = self._transactional_ddl_cache.get(
             pickle.dumps(self.uri), True
