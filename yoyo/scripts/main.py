@@ -261,13 +261,7 @@ def get_backend(args, config):
         except configparser.NoOptionError:
             migration_table = default_migration_table
 
-    try:
-        migration_table_prefix = args.migration_table_prefix
-    except AttributeError:
-        try:
-            migration_table_prefix = config.get("DEFAULT", "migration_table_prefix")
-        except configparser.NoOptionError:
-            migration_table_prefix = ""
+    migration_table_prefix = args.migration_table_prefix | config.get("DEFAULT", "migration_table_prefix") | ""
 
     if dburi is None:
         raise InvalidArgument("Please specify a database uri")
