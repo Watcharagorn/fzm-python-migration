@@ -159,12 +159,15 @@ class DatabaseBackend(object):
     _internal_schema_updated = False
     _transactional_ddl_cache: Dict[bytes, bool] = {}
 
-    def __init__(self, dburi, migration_table):
+    def __init__(self, dburi, migration_table, migration_table_prefix=""):
         self.uri = dburi
         self.DatabaseError = self.driver.DatabaseError
         self._connection = self.connect(dburi)
         self.init_connection(self._connection)
-        self.migration_table = migration_table
+        self.migration_table =  migration_table_prefix + migration_table
+        self.log_table = migration_table_prefix + self.log_table
+        self.lock_table = migration_table_prefix + self.lock_table
+        self.version_table = migration_table_prefix + self.version_table
         self.has_transactional_ddl = self._transactional_ddl_cache.get(
             pickle.dumps(self.uri), True
         )

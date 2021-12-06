@@ -261,6 +261,14 @@ def get_backend(args, config):
         except configparser.NoOptionError:
             migration_table = default_migration_table
 
+    try:
+        migration_table_prefix = args.migration_table_prefix
+    except AttributeError:
+        try:
+            migration_table_prefix = config.get("DEFAULT", "migration_table_prefix")
+        except configparser.NoOptionError:
+            migration_table_prefix = ""
+
     if dburi is None:
         raise InvalidArgument("Please specify a database uri")
 
@@ -272,7 +280,7 @@ def get_backend(args, config):
     except AttributeError:
         pass
 
-    return connections.get_backend(dburi, migration_table)
+    return connections.get_backend(dburi, migration_table, migration_table_prefix)
 
 
 def main(argv=None):
@@ -297,6 +305,8 @@ def main(argv=None):
         config.set("DEFAULT", "database", args.database.replace("%", "%%"))
     if vars(args).get("migration_table"):
         config.set("DEFAULT", "migration_table", args.migration_table)
+    if vars(args).get("migration_table_prefix"):
+        config.set("DEFAULT", "migration_table_prefix", args.migration_table_prefix)
     config.set(
         "DEFAULT",
         "batch_mode",

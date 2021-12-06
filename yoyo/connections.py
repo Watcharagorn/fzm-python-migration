@@ -83,7 +83,7 @@ class BadConnectionURI(Exception):
     """
 
 
-def get_backend(uri, migration_table=default_migration_table):
+def get_backend(uri, migration_table=default_migration_table, migration_table_prefix=""):
     """
     Connect to the given DB uri in the format
     ``driver://user:pass@host:port/database_name?param=value``,
@@ -96,7 +96,7 @@ def get_backend(uri, migration_table=default_migration_table):
         raise BadConnectionURI(
             "Unrecognised database connection scheme %r" % parsed.scheme
         )
-    backend = backend_class(parsed, migration_table)
+    backend = backend_class(parsed, migration_table, migration_table_prefix)
     backend.init_database()
     return backend
 
