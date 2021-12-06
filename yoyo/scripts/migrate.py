@@ -62,7 +62,6 @@ def install_argparsers(global_parser, subparsers):
         "--migration-table-prefix",
         dest="migration_table_prefix",
         action="store",
-        default="",
         help="prefix of all system generate table eg. _yoyo_lock, _yoyo_versions",
     )
 
