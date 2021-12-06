@@ -263,7 +263,7 @@ def get_backend(args, config):
 
     try:
         migration_table_prefix = args.migration_table_prefix or config.get("DEFAULT", "migration_table_prefix")
-    except configparser.NoOptionError, AttributeError:
+    except (configparser.NoOptionError, AttributeError) :
         migration_table_prefix = ""
 
     if dburi is None:
