@@ -58,6 +58,13 @@ def install_argparsers(global_parser, subparsers):
         default=default_migration_table,
         help="Name of table to use for storing " "migration metadata",
     )
+    standard_options_parser.add_argument(
+        "--migration-table-prefix",
+        dest="migration_table_prefix",
+        action="store",
+        default="",
+        help="prefix of all system generate table eg. _yoyo_lock, _yoyo_versions",
+    )
 
     # Options related to filtering the list of migrations
     filter_parser = argparse.ArgumentParser(add_help=False)

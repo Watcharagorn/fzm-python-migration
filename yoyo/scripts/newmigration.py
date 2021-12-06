@@ -78,6 +78,13 @@ def install_argparsers(global_parser, subparsers):
         help="Name of table to use for storing " "migration metadata",
     )
     parser_new.add_argument(
+        "--migration-table-prefix",
+        dest="migration_table_prefix",
+        action="store",
+        default="",
+        help="prefix of all system generate table eg. _yoyo_lock, _yoyo_versions",
+    )
+    parser_new.add_argument(
         "sources", nargs="*", help="Source directory of migration scripts"
     )
     parser_new.add_argument(
