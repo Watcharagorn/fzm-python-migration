@@ -170,7 +170,7 @@ class Migration(object):
             return
 
         collector = StepCollector(migration=self)
-        with open(self.path, "r") as f:
+        with open(self.path, mode="r", encoding="utf-8") as f:
             self.source = f.read()
 
         if self.is_raw_sql():
