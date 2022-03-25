@@ -4,6 +4,25 @@
 FZM-PYTHON-MIGRATION is a database schema migration tool.
 Forked from [Yoyo-migrations](https://pypi.org/project/yoyo-migrations/#history)
 
+## Installation
+```python
+pip install fzm-python-migrations
+```
+
+## Command line usage
+### ● run migration
+```comman
+yoyo apply {migration_folder}
+```
+### ● add new migration
+```
+yoyo new {migration_folder} -m {migration_name}
+```
+
+### ● List available migrations
+```
+yoyo list {migration_folder}
+```
 
 ## Additional Feature from the source
 
