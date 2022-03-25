@@ -1,5 +1,5 @@
-FZM-PYTHON-MIGRATION
------------------------
+# FZM-PYTHON-MIGRATION
+[![pypirepo](https://img.shields.io/badge/pypi-blue.svg)](https://pypi.org/project/fzm-python-migrations/)
 
 FZM-PYTHON-MIGRATION is a database schema migration tool.
 Forked from [Yoyo-migrations](https://pypi.org/project/yoyo-migrations/#history)
