@@ -96,7 +96,7 @@ def install_argparsers(global_parser, subparsers):
     )
 
 
-def new_migration(args, config):
+def new_migration(args, config) -> int:
 
     try:
         directory = args.sources[0]
@@ -122,7 +122,7 @@ def new_migration(args, config):
     else:
         p = create_with_editor(config, directory, migration_source, extension)
         if p is None:
-            return
+            return 1
 
     try:
         command = config.get("DEFAULT", CONFIG_NEW_MIGRATION_COMMAND_KEY)
@@ -133,6 +133,7 @@ def new_migration(args, config):
         pass
 
     print("Created file", p)
+    return 0
 
 
 def slugify(message):

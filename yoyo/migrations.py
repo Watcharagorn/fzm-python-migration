@@ -15,7 +15,6 @@
 from collections import Counter
 from collections import OrderedDict
 from collections import abc
-from collections import defaultdict
 from copy import copy
 from glob import glob
 from itertools import chain
@@ -126,9 +125,11 @@ def read_sql_migration(
         with open(path, "r", encoding="UTF-8") as f:
             statements = sqlparse.split(f.read())
             if statements:
-                (directives, leading_comment, sql,) = parse_metadata_from_sql_comments(
-                    statements[0]
-                )
+                (
+                    directives,
+                    leading_comment,
+                    sql,
+                ) = parse_metadata_from_sql_comments(statements[0])
                 statements[0] = sql
     statements = [s for s in statements if s.strip()]
     return directives, leading_comment, statements
@@ -170,13 +171,14 @@ class Migration(object):
             return
 
         collector = StepCollector(migration=self)
-        with open(self.path, mode="r", encoding="utf-8") as f:
+        with open(self.path, "r") as f:
             self.source = f.read()
 
         if self.is_raw_sql():
             self.module = types.ModuleType(self.path)
         else:
             spec = importlib.util.spec_from_file_location(self.path, self.path)
+            assert spec is not None
             self.module = importlib.util.module_from_spec(spec)
 
         self.module.step = collector.add_step  # type: ignore
@@ -211,15 +213,15 @@ class Migration(object):
 
         else:
             try:
-                if spec.loader is None:
+                if spec and spec.loader:
+                    spec.loader.exec_module(self.module)
+                else:
                     logger.exception(
                         "Could not import migration from %r: "
                         "ModuleSpec has no loader attached",
                         self.path,
                     )
                     raise exceptions.BadMigration(self.path)
-
-                spec.loader.exec_module(self.module)  # type: ignore
 
             except Exception as e:
                 logger.exception("Could not import migration from %r: %r", self.path, e)
@@ -495,7 +497,9 @@ def read_migrations(*sources):
                 migration_class = PostApplyHookMigration
 
             migration = migration_class(
-                os.path.splitext(os.path.basename(path))[0], path, source_dir=source,
+                os.path.splitext(os.path.basename(path))[0],
+                path,
+                source_dir=source,
             )
             ml = migrations.setdefault(source, MigrationList())
             if migration_class is PostApplyHookMigration:
@@ -719,72 +723,18 @@ def heads(migration_list):
     return heads
 
 
-def topological_sort(
-    migration_list: Iterable[Migration],
-) -> Iterable[Migration]:
+def topological_sort(migrations: Iterable[Migration]) -> Iterable[Migration]:
+    from yoyo.topologicalsort import topological_sort as topological_sort_impl
+    from yoyo.topologicalsort import CycleError
 
-    # Make a copy of migration_list. It's probably an iterator.
-    migration_list = list(migration_list)
-
-    # Track graph edges in two parallel data structures.
-    # Use OrderedDict so that we can traverse edges in order
-    # and keep the sort stable
-    forward_edges = defaultdict(
-        OrderedDict
-    )  # type: Dict[Migration, Dict[Migration, int]]
-    backward_edges = defaultdict(
-        OrderedDict
-    )  # type: Dict[Migration, Dict[Migration, int]]
-
-    def sort_by_stability_order(
-        items, ordering={m: index for index, m in enumerate(migration_list)}
-    ):
-        return sorted(
-            (item for item in items if item in ordering), key=ordering.get
+    migration_list = list(migrations)
+    all_migrations = set(migration_list)
+    dependency_graph = {m: (m.depends & all_migrations) for m in migration_list}
+    try:
+        return topological_sort_impl(migration_list, dependency_graph)
+    except CycleError as e:
+        raise exceptions.BadMigration(
+            "Circular dependencies among these migrations {}".format(
+                ", ".join(m.id for m in e.args[1])
+            )
         )
-
-    for m in migration_list:
-        for n in sort_by_stability_order(m.depends):
-            forward_edges[n][m] = 1
-            backward_edges[m][n] = 1
-
-    def check_cycles(item):
-        stack: List[Tuple[Migration, List[Migration]]] = [(item, [])]
-        while stack:
-            n, path = stack.pop()
-            if n in path:
-                raise exceptions.BadMigration(
-                    "Circular dependencies among these migrations {}".format(
-                        ", ".join(m.id for m in path + [n])
-                    )
-                )
-            stack.extend((f, path + [n]) for f in forward_edges[n])
-
-    seen = set()
-    for item in migration_list:
-
-        if item in seen:
-            continue
-
-        check_cycles(item)
-
-        # if item is in a dedepency graph, go back to the root node
-        while backward_edges[item]:
-            item = next(iter(backward_edges[item]))
-
-        # is item at the start of a dependency graph?
-        if forward_edges[item]:
-            stack = [item]
-            while stack:
-                m = stack.pop()
-                yield m
-                seen.add(m)
-                for child in list(reversed(list(forward_edges[m]))):
-                    if all(
-                        dependency in seen
-                        for dependency in backward_edges[child]
-                    ):
-                        stack.append(child)
-        else:
-            yield item
-            seen.add(item)

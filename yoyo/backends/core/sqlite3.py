@@ -12,26 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__all__ = [
-    "ancestors",
-    "default_migration_table",
-    "descendants",
-    "get_backend",
-    "group",
-    "logger",
-    "read_migrations",
-    "step",
-    "transaction",
-]
+from yoyo.backends.base import DatabaseBackend
 
-from yoyo.connections import get_backend
-from yoyo.migrations import ancestors
-from yoyo.migrations import default_migration_table
-from yoyo.migrations import descendants
-from yoyo.migrations import group
-from yoyo.migrations import logger
-from yoyo.migrations import read_migrations
-from yoyo.migrations import step
-from yoyo.migrations import transaction
 
-__version__ = "0.2.0"
+class SQLiteBackend(DatabaseBackend):
+
+    driver_module = "sqlite3"
+    list_tables_sql = "SELECT name FROM sqlite_master WHERE type = 'table'"
+
+    def connect(self, dburi):
+        # Ensure that multiple connections share the same data
+        # https://sqlite.org/sharedcache.html
+        conn = self.driver.connect(
+            f"file:{dburi.database}?cache=shared",
+            uri=True,
+            detect_types=self.driver.PARSE_DECLTYPES,
+        )
+        conn.isolation_level = None
+        return conn

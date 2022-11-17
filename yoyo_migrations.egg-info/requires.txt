@@ -1,5 +1,6 @@
 sqlparse
 tabulate
+importlib_metadata
 
 [mysql]
 PyMySQL

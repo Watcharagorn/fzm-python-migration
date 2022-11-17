@@ -60,8 +60,7 @@ class CustomInterpolation(configparser.BasicInterpolation):
 def get_interpolation_defaults(path: Optional[str] = None):
     parser = configparser.ConfigParser()
     defaults = {
-        parser.optionxform(k): v.replace("%", "%%")
-        for k, v in os.environ.items()
+        parser.optionxform(k): v.replace("%", "%%") for k, v in os.environ.items()
     }
     if path:
         defaults["here"] = os.path.dirname(os.path.abspath(path))
@@ -80,15 +79,14 @@ def update_argparser_defaults(parser, defaults):
     arguments the parser has configured.
     """
     known_args = {action.dest for action in parser._actions}
-    parser.set_defaults(
-        **{k: v for k, v in defaults.items() if k in known_args}
-    )
+    parser.set_defaults(**{k: v for k, v in defaults.items() if k in known_args})
 
 
 def read_config(src: Optional[str]) -> ConfigParser:
     """
-    Read the configuration file at ``path``, or return an empty
-    ConfigParse object if ``path`` is ``None``.
+    Read the configuration file at ``src`` and construct a ConfigParser instance.
+
+    If ``src`` is None a new, empty ConfigParse object will be created.
     """
     if src is None:
         return get_configparser(get_interpolation_defaults())
@@ -179,7 +177,7 @@ def find_includes(
     return result[INHERIT], result[INCLUDE]
 
 
-def merge_configs(configs: List[ConfigParser],) -> ConfigParser:
+def merge_configs(configs: List[ConfigParser]) -> ConfigParser:
     def merge(c1, c2):
         c1.read_dict(c2)
         return c1
@@ -208,3 +206,12 @@ def find_config():
             return path
         d = os.path.dirname(d)
     return None
+
+
+def config_changed(config: ConfigParser, path: str) -> bool:
+    def to_dict(config: ConfigParser):
+        return {k: dict(section.items()) for k, section in config.items()}
+
+    if Path(path).exists():
+        return to_dict(read_config(path)) != to_dict(config)
+    return True

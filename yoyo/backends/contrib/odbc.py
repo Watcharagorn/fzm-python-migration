@@ -12,26 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__all__ = [
-    "ancestors",
-    "default_migration_table",
-    "descendants",
-    "get_backend",
-    "group",
-    "logger",
-    "read_migrations",
-    "step",
-    "transaction",
-]
+from yoyo.backends.base import DatabaseBackend
 
-from yoyo.connections import get_backend
-from yoyo.migrations import ancestors
-from yoyo.migrations import default_migration_table
-from yoyo.migrations import descendants
-from yoyo.migrations import group
-from yoyo.migrations import logger
-from yoyo.migrations import read_migrations
-from yoyo.migrations import step
-from yoyo.migrations import transaction
 
-__version__ = "0.2.0"
+class ODBCBackend(DatabaseBackend):
+    driver_module = "pyodbc"
+
+    def connect(self, dburi):
+        args = [
+            ("UID", dburi.username),
+            ("PWD", dburi.password),
+            ("ServerName", dburi.hostname),
+            ("Port", dburi.port),
+            ("Database", dburi.database),
+        ]
+        args.extend(dburi.args.items())
+        s = ";".join("{}={}".format(k, v) for k, v in args if v is not None)
+        return self.driver.connect(s)

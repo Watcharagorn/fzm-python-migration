@@ -18,6 +18,7 @@ import configparser
 import logging
 import os
 import sys
+import typing as t
 
 from yoyo import connections
 from yoyo import default_migration_table
@@ -27,6 +28,7 @@ from yoyo.config import CONFIG_FILENAME
 from yoyo.config import find_config
 from yoyo.config import read_config
 from yoyo.config import save_config
+from yoyo.config import config_changed
 from yoyo.config import update_argparser_defaults
 
 verbosity_levels = {
@@ -46,11 +48,13 @@ class InvalidArgument(Exception):
     pass
 
 
-def parse_args(argv=None):
+def parse_args(
+    argv=None,
+) -> t.Tuple[configparser.ConfigParser, argparse.ArgumentParser, argparse.Namespace]:
     """
     Parse the config file and command line args.
 
-    :return: tuple of (argparser, parsed_args)
+    :return: tuple of ``(parsed config file, argument parser, parsed arguments)``
     """
     #: List of arguments whose defaults should be read from the config file
     config_args = {
@@ -67,11 +71,8 @@ def parse_args(argv=None):
     global_args, _ = globalparser.parse_known_args(argv)
 
     # Read the config file and create a dictionary of defaults for argparser
-    config = read_config(
-        (global_args.config or find_config())
-        if global_args.use_config_file
-        else None
-    )
+    configfile = global_args.config or find_config()
+    config = read_config(configfile if global_args.use_config_file else None)
 
     defaults = {}
     for argname, getter in config_args.items():
@@ -116,8 +117,7 @@ def make_argparser():
         dest="verbosity",
         action="count",
         default=min_verbosity,
-        help="Verbose output. Use multiple times "
-        "to increase level of verbosity",
+        help="Verbose output. Use multiple times to increase level of verbosity",
     )
     global_parser.add_argument(
         "-b",
@@ -140,8 +140,11 @@ def make_argparser():
 
     subparsers = argparser.add_subparsers(help="Commands help")
 
-    from . import migrate, newmigration
+    from . import migrate
+    from . import newmigration
+    from . import init
 
+    init.install_argparsers(global_parser, subparsers)
     migrate.install_argparsers(global_parser, subparsers)
     newmigration.install_argparsers(global_parser, subparsers)
 
@@ -180,9 +183,7 @@ def upgrade_legacy_config(args, config, sources):
 
         legacy_config = read_config(path)
 
-        def transfer_setting(
-            oldname, newname, transform=None, section="DEFAULT"
-        ):
+        def transfer_setting(oldname, newname, transform=None, section="DEFAULT"):
             try:
                 config.get(section, newname)
             except configparser.NoOptionError:
@@ -205,9 +206,7 @@ def upgrade_legacy_config(args, config, sources):
         config_path = args.config or CONFIG_FILENAME
         if not args.batch_mode:
             if utils.confirm(
-                "Move legacy configuration in {!r} to {!r}?".format(
-                    path, config_path
-                )
+                "Move legacy configuration in {!r} to {!r}?".format(path, config_path)
             ):
                 save_config(config, config_path)
                 try:
@@ -231,9 +230,7 @@ def upgrade_legacy_config(args, config, sources):
             )
 
             try:
-                args.database = args.database or legacy_config.get(
-                    "DEFAULT", "dburi"
-                )
+                args.database = args.database or legacy_config.get("DEFAULT", "dburi")
             except configparser.NoOptionError:
                 pass
             try:
@@ -262,8 +259,10 @@ def get_backend(args, config):
             migration_table = default_migration_table
 
     try:
-        migration_table_prefix = args.migration_table_prefix or config.get("DEFAULT", "migration_table_prefix")
-    except (configparser.NoOptionError, AttributeError) :
+        migration_table_prefix = args.migration_table_prefix or config.get(
+            "DEFAULT", "migration_table_prefix"
+        )
+    except (configparser.NoOptionError, AttributeError):
         migration_table_prefix = ""
 
     if dburi is None:
@@ -317,13 +316,17 @@ def main(argv=None):
 
     try:
         if vars(args).get("func"):
-            args.func(args, config)
+            exitcode = args.func(args, config)
     except InvalidArgument as e:
         argparser.error(e.args[0])
 
     if config_is_empty and args.use_config_file and not args.batch_mode:
-        prompt_save_config(config, args.config or CONFIG_FILENAME)
+        config_file = args.config or CONFIG_FILENAME
+        if config_changed(config, config_file):
+            prompt_save_config(config, config_file)
+
+    return exitcode
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    sys.exit(main(sys.argv[1:]))

@@ -76,17 +76,12 @@ def install_argparsers(global_parser, subparsers):
     filter_parser.add_argument(
         "-r",
         "--revision",
-        help=(
-            "Apply/rollback migration with id REVISION and all its "
-            "dependencies"
-        ),
+        help=("Apply/rollback migration with id REVISION and all its dependencies"),
         metavar="REVISION",
     )
 
     # Options related to applying/rolling back migrations
-    apply_parser = argparse.ArgumentParser(
-        add_help=False, parents=[filter_parser]
-    )
+    apply_parser = argparse.ArgumentParser(add_help=False, parents=[filter_parser])
     apply_parser.add_argument(
         "-a",
         "--all",
@@ -100,8 +95,7 @@ def install_argparsers(global_parser, subparsers):
         "--force",
         dest="force",
         action="store_true",
-        help="Force apply/rollback of steps even if "
-        "previous steps have failed",
+        help="Force apply/rollback of steps even if previous steps have failed",
     )
 
     parser_apply = subparsers.add_parser(
@@ -125,7 +119,10 @@ def install_argparsers(global_parser, subparsers):
     )
     parser_develop.set_defaults(func=develop, command_name="develop")
     parser_develop.add_argument(
-        "-n", type=int, help="Act on the last N migrations", default=1,
+        "-n",
+        type=int,
+        help="Act on the last N migrations",
+        default=1,
     )
 
     parser_list = subparsers.add_parser(
@@ -189,9 +186,7 @@ def migrations_to_revision(migrations, revision, direction):
 
     targets = [m for m in migrations if revision in m.id]
     if len(targets) == 0:
-        raise InvalidArgument(
-            "'{}' doesn't match any revisions.".format(revision)
-        )
+        raise InvalidArgument("'{}' doesn't match any revisions.".format(revision))
     if len(targets) > 1:
         raise InvalidArgument(
             "'{}' matches multiple revisions. "
@@ -239,12 +234,7 @@ def get_migrations(args, backend, direction=None):
     if not args.batch_mode and not args.revision:
         migrations = prompt_migrations(backend, migrations, args.command_name)
 
-    if (
-        args.batch_mode
-        and not args.revision
-        and not args.all
-        and args.func is rollback
-    ):
+    if args.batch_mode and not args.revision and not args.all and args.func is rollback:
         if len(migrations) > 1:
             warnings.warn(
                 "Only rolling back a single migration."
@@ -264,9 +254,7 @@ def get_migrations(args, backend, direction=None):
             print("  [{m.id}]".format(m=m))
         prompt = "{} {} to {}".format(
             args.command_name.title(),
-            utils.plural(
-                len(migrations), "this migration", "these %d migrations"
-            ),
+            utils.plural(len(migrations), "this migration", "these %d migrations"),
             dburi,
         )
         if not utils.confirm(prompt, default="y"):
@@ -274,30 +262,33 @@ def get_migrations(args, backend, direction=None):
     return migrations
 
 
-def apply(args, config):
+def apply(args, config) -> int:
     backend = get_backend(args, config)
     with backend.lock():
         migrations = get_migrations(args, backend)
         backend.apply_migrations(migrations, args.force)
+    return 0
 
 
-def reapply(args, config):
+def reapply(args, config) -> int:
     backend = get_backend(args, config)
     with backend.lock():
         migrations = get_migrations(args, backend)
         backend.rollback_migrations(migrations, args.force)
         migrations = backend.to_apply(migrations)
         backend.apply_migrations(migrations, args.force)
+    return 0
 
 
-def rollback(args, config):
+def rollback(args, config) -> int:
     backend = get_backend(args, config)
     with backend.lock():
         migrations = get_migrations(args, backend)
         backend.rollback_migrations(migrations, args.force)
+    return 0
 
 
-def develop(args, config):
+def develop(args, config) -> int:
     args.batch_mode = True
     backend = get_backend(args, config)
     with backend.lock():
@@ -321,28 +312,32 @@ def develop(args, config):
             backend.rollback_migrations(migrations, args.force)
             migrations = get_migrations(args, backend, "apply")
             backend.apply_migrations(migrations, args.force)
+    return 0
 
 
-def mark(args, config):
+def mark(args, config) -> int:
     backend = get_backend(args, config)
     with backend.lock():
         migrations = get_migrations(args, backend)
         backend.mark_migrations(migrations)
+    return 0
 
 
-def unmark(args, config):
+def unmark(args, config) -> int:
     backend = get_backend(args, config)
     with backend.lock():
         migrations = get_migrations(args, backend)
         backend.unmark_migrations(migrations)
+    return 0
 
 
-def break_lock(args, config):
+def break_lock(args, config) -> int:
     backend = get_backend(args, config)
     backend.break_lock()
+    return 0
 
 
-def list_migrations(args, config):
+def list_migrations(args, config) -> int:
     backend = get_backend(args, config)
     migrations = read_migrations(*args.sources)
     migrations = filter_migrations(migrations, args.match)
@@ -361,6 +356,7 @@ def list_migrations(args, config):
             for m in migrations
         )
         print(tabulate.tabulate(data, headers=("STATUS", "ID", "SOURCE")))
+    return 0
 
 
 def prompt_migrations(backend, migrations, direction):
@@ -391,15 +387,11 @@ def prompt_migrations(backend, migrations, direction):
                 choice = "n" if is_applied else "y"
             else:
                 choice = "y" if is_applied else "n"
-        options = "".join(
-            o.upper() if o == choice else o.lower() for o in "ynvdaqjk?"
-        )
+        options = "".join(o.upper() if o == choice else o.lower() for o in "ynvdaqjk?")
 
         print("")
         print("[%s]" % (mig.migration.id,))
-        response = utils.prompt(
-            "Shall I %s this migration?" % (direction,), options
-        )
+        response = utils.prompt("Shall I %s this migration?" % (direction,), options)
 
         if response == "?":
             print("")
@@ -409,8 +401,7 @@ def prompt_migrations(backend, migrations, direction):
             print("v: view this migration in full")
             print("")
             print(
-                "d: %s the selected migrations, skipping any remaining"
-                % (direction,)
+                "d: %s the selected migrations, skipping any remaining" % (direction,)
             )
             print("a: %s all the remaining migrations" % (direction,))
             print("q: cancel without making any changes")

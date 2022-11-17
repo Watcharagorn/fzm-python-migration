@@ -19,88 +19,184 @@ They can be as simple as this:
    ]
 
 
-Installation
-==================
+Installation and project setup
+==============================
 
-Install yoyo-migrations using from the PyPI, for example:
+Install yoyo-migrations from PyPI:
 
 .. code:: shell
 
    pip install yoyo-migrations
 
 
+Initialize yoyo for your project, supplying a database connection string and migrations directory name, for example:
+
+.. code:: shell
+
+    yoyo init --database sqlite:///mydb.sqlite3 migrations
+
+This will create a new, empty directory called ``migrations`` and install a
+``yoyo.ini`` configuration file in the current directory. The configuration file
+will contain any database credentials supplied on the command line. If you do
+not wish this to happen, then omit the ``--database`` argument from the
+command.
+
+Create a new migration by running ``yoyo new``. By default, a Python format file is generated, use ``--sql`` if you prefer SQL format:
+
+.. code:: shell
+
+    yoyo new --sql
+
+An editor will open with a template migration file.
+Add a comment explaining what the migration does followed by the SQL commands,
+for example:
+
+.. code:: sql
+
+   -- Create table foo
+   -- depends:
+
+   CREATE TABLE foo (
+        a int
+   );
+
+
+Save and exit, and the new migration file will be created.
+Check your migration has been created with ``yoyo list`` and apply it with
+``yoyo apply``:
+
+.. code:: shell
+
+    $ yoyo list
+    $ yoyo apply
+
+
 
 Command line usage
 ==================
 
-Start a new migration:
+You can see the list of available commands by running:
+
+.. command-output:: yoyo --help
+
+
+You can check options for any command with ``yoyo <command> --help``
+
+yoyo new
+--------
+
+Start a new migration. ``yoyo new`` will create a new migration file and opens it your configured editor.
+
+By default a Python formation migration will be created. To use the simpler SQL format, specify ``--sql``.
 
 .. code:: shell
 
-  yoyo new ./migrations -m "Add column to foo"
+  yoyo new -m "Add column to foo"
+  yoyo new --sql
 
-Apply migrations from directory ``migrations`` to a PostgreSQL database:
+yoyo list
+----------
 
-.. code:: shell
+List available migrations. Each migration will be prefixed with one of ``U``
+(unapplied) or ``A`` (applied).
 
-   yoyo apply --database postgresql://scott:tiger@localhost/db ./migrations
+yoyo apply
+----------
 
-Rollback migrations previously applied to a MySQL database:
-
-.. code:: shell
-
-   yoyo rollback --database mysql://scott:tiger@localhost/database ./migrations
-
-Reapply (ie rollback then apply again) migrations to a SQLite database at
-location ``/home/sheila/important.db``:
-
-.. code:: shell
-
-    yoyo reapply --database sqlite:////home/sheila/important.db ./migrations
-
-List available migrations:
-
-.. code:: shell
-
-    yoyo list --database sqlite:////home/sheila/important.db ./migrations
+Apply migrations to the target database. By default this will prompt you for each unapplied migration. To turn off prompting use ``--batch`` or specify ``batch_mode = on`` in ``yoyo.ini``.
 
 
-During development, the ``yoyo develop`` command can be used to apply any
-unapplied migrations without further prompting:
+yoyo rollback
+-------------
 
-.. code:: shell
+By default this will prompt you for each applied migration, starting with the most recently applied.
 
-    $ yoyo develop --database postgresql://localhost/mydb migrations
-    Applying 3 migrations:
-        [00000000_initial-schema]
-        [00000001_add-table-foo]
-        [00000002_add-table-bar]
+If you wish to rollback a single migration, specify the migration with the ``-r``/``--revision`` flag. Note that this will also cause any migrations that depend on the selected migration to be rolled back.
 
-If there are no migrations waiting to be applied the ``develop`` command will
-instead roll back and reapply the last migration:
 
-.. code:: shell
+yoyo reapply
+-------------
 
-    $ yoyo develop --database postgresql://localhost/dev ./migrations
-    Reapplying 1 migration:
-        [00000002_add-table-bar]
+Reapply (ie rollback then apply again) migrations. As with `yoyo rollback`_, you can select a target migration with ``-r``/``--revision``
+
+
+yoyo develop
+------------
+
+Apply any unapplied migrations without prompting.
+
+If there are no unapplied migrations, rollback and reapply the most recent
+migration. Use ``yoyo develop -n <n>`` to act on just the *n* most recently
+applied migrations.
+
+yoyo mark
+---------
+
+Mark one or more migrations as applied, without actually applying them.
+
+yoyo unmark
+-----------
+
+Unmark one or more migrations as unapplied, without actually rolling them back.
+
 
 
 Connecting to a database
-------------------------
+========================
 
-Database connections are specified using a URL. Examples:
+Database connections are specified using a URL, for example:
+
+.. code:: shell
+
+    yoyo list --database postgresql://scott:tiger@localhost/mydatabase
+
+The protocol part of the URL (the part before ``://``) is used to specify the backend.
+Yoyo provides the following core backends:
+
+- ``postgresql`` (psycopg2_)
+- ``postgresql+psycopg`` (psycopg3_)
+- ``mysql`` (pymysql_)
+- ``mysql+mysqldb`` (mysqlclient_)
+- ``sqlite`` (sqlite3_)
+
+And these backends have been contributed and are bundled with yoyo:
+
+- ``odbc`` (pyodbc_)
+- ``oracle`` (`cx_Oracle`_)
+- ``snowflake`` (snowflake_)
+- ``redshift`` (psycopg2_)
+
+How other parts of the URL are interpreted depends on the underlying backend
+and the DB-API driver used. The host part especially tends to be interpreted
+differently by drivers. A few of the more important differences are listed below.
+
+MySQL connections
+-----------------
+
+mysqlclient_ and pymysql_ have
+different ways to interpret the ``host`` part of the connection URL:
+
+- With mysqlclient_ (``mysql+mysqldb://``),
+  setting the host to ``localhost`` or leaving it empty causes the
+  driver to attempt a local unix socket connection.
+- In pymysql_ (``mysql://``),
+  the driver will attempt a tcp connection in both cases.
+  Specify a unix socket connection
+  with the ``unix_socket`` option (eg ``?unix_socket=/tmp/mysql.sock``)
+
+To enable SSL, specify ``?ssl=1`` and the following options as required:
+
+- ``sslca``
+- ``sslcapath``
+- ``sslcert``
+- ``sslkey``
+- ``sslcipher``
+
+These options correspond to the ``ca``, ``capath``, ``cert``, ``key`` and ``cipher`` options used by `mysql_ssl_set <https://dev.mysql.com/doc/c-api/8.0/en/mysql-ssl-set.html>`_.
+
+Example configurations:
 
 .. code:: ini
-
-  # SQLite: use 4 slashes for an absolute database path on unix like platforms
-  database = sqlite:////home/user/mydb.sqlite
-
-  # SQLite: use 3 slashes for a relative path
-  database = sqlite:///mydb.sqlite
-
-  # SQLite: absolute path on Windows.
-  database = sqlite:///c:\home\user\mydb.sqlite
 
   # MySQL: Network database connection
   database = mysql://scott:tiger@localhost/mydatabase
@@ -114,14 +210,50 @@ Database connections are specified using a URL. Examples:
   # MySQL with SSL/TLS enabled
   database = mysql+mysqldb://scott:tiger@localhost/mydatabase?ssl=yes&sslca=/path/to/cert
 
-  # PostgreSQL: database connection
+PostgreSQL connections
+----------------------
+
+The psycopg family of drivers will use a unix socket if the host is left empty
+(or the value of ``PGHOST`` if this is set in your environment). Otherwise it will attempt a tcp connection to the specified host.
+
+To force a unix socket connection leave the host part of the URL
+empty and provide a ``host`` option that points to the directory containing the socket
+(eg ``postgresql:///mydb?host=/path/to/socket/``).
+
+The postgresql backends also allow a custom schema to be selected by specifying a ``schema`` option, eg ``postgresql://…/mydatabase?schema=myschema``.
+
+Example configurations:
+
+.. code:: ini
+
   database = postgresql://scott:tiger@localhost/mydatabase
 
-  # PostgreSQL: unix socket connection
+  # unix socket connection
   database = postgresql://scott:tiger@/mydatabase
 
-  # PostgreSQL: changing the schema (via set search_path)
+  # unix socket at a non-standard location and port number
+  database = postgresql://scott:tiger@/mydatabase?host=/var/run/postgresql&port=5434
+
+  # PostgreSQL with psycopg 3 driver
+  database = postgresql+psycopg://scott:tiger@localhost/mydatabase
+
+  # Changing the default schema
   database = postgresql://scott:tiger@/mydatabase?schema=some_schema
+
+SQLite connections
+------------------
+
+The SQLite backend ignores everything in the connection URL except the database
+name, which should be a filename, or the special value ``:memory:`` for an in-memory database.
+
+3 slashes are required to specify a relative path::
+
+    sqlite:///mydb.sqlite
+
+and 4 for an absolute path on unix-like platforms::
+
+    sqlite:////home/user/mydb.sqlite
+
 
 Password security
 -----------------
@@ -238,7 +370,7 @@ Migrations may declare dependencies on other migrations via the
     ]
 
 
-If you use the ``yoyo new`` command the ``_depends__`` attribute will be auto
+If you use the ``yoyo new`` command the ``__depends__`` attribute will be auto
 populated for you.
 
 
@@ -448,7 +580,7 @@ rollbacks happen. For example:
 Disabling transactions
 ----------------------
 
-You can disable transaction handling within a migration by setting
+Disable transaction handling within a migration by setting
 ``__transactional__ = False``, eg:
 
 .. code:: python
@@ -498,7 +630,7 @@ The following example shows how to apply migrations from inside python code:
     from yoyo import read_migrations
     from yoyo import get_backend
 
-    backend = get_backend('postgres://myuser@localhost/mydatabase')
+    backend = get_backend('postgresql://myuser@localhost/mydatabase')
     migrations = read_migrations('path/to/migrations')
 
     with backend.lock():
@@ -514,6 +646,31 @@ The following example shows how to apply migrations from inside python code:
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
+
+
+Adding custom backends
+======================
+
+Backends are discovered using Python importlib.metadata entry points.
+
+To add a custom backend, create a python package containing a subclass of
+:class:`yoyo.backends.base.DatabaseBackend` and configure it
+in the package metadata (typically in ``setup.cfg``), for example:
+
+.. code:: ini
+
+    [options.entry_points]
+
+    yoyo.backends =
+        mybackend = mypackage:MyBackend
+
+
+Use the backend by specifying ``'mybackend'`` as the driver protocol::
+
+  .. code:: sh
+
+   yoyo apply --database my_backend://...
+
 
 Contributing
 =============
@@ -582,3 +739,11 @@ Changelog
 =========
 
 .. include:: ../CHANGELOG.rst
+.. _mysqlclient: https://pypi.org/project/mysqlclient/
+.. _pymysql: https://pypi.org/project/pymysql/
+.. _psycopg2: https://pypi.org/project/psycopg2/
+.. _psycopg3: https://pypi.org/project/psycopg/
+.. _sqlite3: https://docs.python.org/3/library/sqlite3.html
+.. _pyodbc: https://pypi.org/project/pyodbc/
+.. _cx_Oracle: https://pypi.org/project/cx-Oracle/
+.. _snowflake: https://pypi.org/project/snowflake-connector-python/
